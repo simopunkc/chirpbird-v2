@@ -12,16 +12,19 @@ clone this project
 git clone https://github.com/simopunkc/chirpbird-v2.git
 ```
 
-if you want to run it on localhost then you have to edit .env.example file in backend folder
+You have to edit the .env.example file in the backend folder
 
 nano /chirpbird-v2/backend/.env.example
 
 ```sh
 OAUTH_CLIENT_ID='put your Google Oauth Client ID here'
 OAUTH_SECRET='put your Google Oauth Secret here'
-FRONTEND_HOST='localhost:9000'
-FRONTEND_DOMAIN='localhost'
-FRONTEND_PROTOCOL='http://'
+```
+
+if you do not have a Google Oauth Client ID then you must first create it on the Credentials menu on the Google Cloud Platform. You must also fill in the Authorized Redirect URI box with the path /oauth/google/verify. for example:
+
+```sh
+http://localhost/oauth/google/verify
 ```
 
 make sure docker-compose is installed. after that run bash script with below command
