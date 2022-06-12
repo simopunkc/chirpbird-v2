@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<title>Chirpbird by simopunkc</title>
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<link href="/style.css" rel="stylesheet" />
+		<link href="/favicon.ico" rel="shortcut icon" />
+	</head>
+	<body>
+		<button onClick="closeSession()">Log Out</button>
+		<button onClick="openModal1()">Create Group</button>
+		<button onClick="openModal2()">Join Group</button>
+		<div id="tampung">
+			<div id="group_container"></div>
+			<div id="messages_container"></div>
+			<div class="clear"></div>
+		</div>
+		<div id="myModal1" class="modal">
+			<div class="modal-content center">
+				<input
+					type="text"
+					value=""
+					placeholder="Type group name"
+					id="group_input"
+				/>
+				<button onClick="createGroup()">Save</button>
+				<button onClick="closeModal1()">Cancel</button>
+			</div>
+		</div>
+		<div id="myModal2" class="modal">
+			<div class="modal-content center">
+				<input
+					type="text"
+					value=""
+					placeholder="Type token join"
+					id="join_input"
+				/>
+				<button onClick="joinGroup()">Join</button>
+				<button onClick="closeModal2()">Cancel</button>
+			</div>
+		</div>
+		<div class="center">
+			<textarea placeholder="Type message" id="message_input"></textarea>
+			<button onClick="sendMessage()">Send message</button>
+		</div>
+		<script src="/script.js"></script>
+	</body>
+</html>

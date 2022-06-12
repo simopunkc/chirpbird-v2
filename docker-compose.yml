@@ -1,0 +1,283 @@
+version: "3.9"
+
+services:
+  mongo1:
+    container_name: mongo1
+    image: mongo:5.0
+    volumes:
+      - ./mongodb/init-mongodb.sh:/scripts/init-mongodb.sh
+    expose:
+      - 27017
+    restart: always
+    command: mongod --replSet dbrs
+    networks:
+      clusternetwork:
+        ipv4_address: 172.16.0.2
+  mongo2:
+    container_name: mongo2
+    image: mongo:5.0
+    expose:
+      - 27017
+    restart: always
+    command: mongod --replSet dbrs
+    networks:
+      clusternetwork:
+        ipv4_address: 172.16.0.3
+  mongo3:
+    container_name: mongo3
+    image: mongo:5.0
+    expose:
+      - 27017
+    restart: always
+    command: mongod --replSet dbrs
+    networks:
+      clusternetwork:
+        ipv4_address: 172.16.0.4
+  redis1:
+    container_name: redis1
+    image: redis
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./redis/redis1.conf:/usr/local/etc/redis/redis.conf
+    expose:
+      - 6379
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      clusternetwork:
+        ipv4_address: 172.16.0.5
+  redis2:
+    container_name: redis2
+    image: redis
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./redis/redis2.conf:/usr/local/etc/redis/redis.conf
+    expose:
+      - 6379
+    depends_on:
+      - redis1
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      clusternetwork:
+        ipv4_address: 172.16.0.6
+  redis3:
+    container_name: redis3
+    image: redis
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./redis/redis3.conf:/usr/local/etc/redis/redis.conf
+    expose:
+      - 6379
+    depends_on:
+      - redis1
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      clusternetwork:
+        ipv4_address: 172.16.0.7
+  sentinel1:
+    container_name: sentinel1
+    image: redis
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./redis/sentinel1.conf:/usr/local/etc/redis/sentinel.conf
+    expose:
+      - 26379
+    depends_on:
+      - redis1
+    restart: unless-stopped
+    command: bash -c "chown redis:redis /usr/local/etc/redis/sentinel.conf && redis-server /usr/local/etc/redis/sentinel.conf --sentinel"
+    networks:
+      clusternetwork:
+        ipv4_address: 172.16.0.8
+  sentinel2:
+    container_name: sentinel2
+    image: redis
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./redis/sentinel2.conf:/usr/local/etc/redis/sentinel.conf
+    expose:
+      - 26379
+    depends_on:
+      - redis1
+    restart: unless-stopped
+    command: bash -c "chown redis:redis /usr/local/etc/redis/sentinel.conf && redis-server /usr/local/etc/redis/sentinel.conf --sentinel"
+    networks:
+      clusternetwork:
+        ipv4_address: 172.16.0.9
+  sentinel3:
+    container_name: sentinel3
+    image: redis
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./redis/sentinel3.conf:/usr/local/etc/redis/sentinel.conf
+    expose:
+      - 26379
+    depends_on:
+      - redis1
+    restart: unless-stopped
+    command: bash -c "chown redis:redis /usr/local/etc/redis/sentinel.conf && redis-server /usr/local/etc/redis/sentinel.conf --sentinel"
+    networks:
+      clusternetwork:
+        ipv4_address: 172.16.0.10
+  traefik:
+    image: "traefik:v2.6"
+    container_name: "traefik"
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.http.address=:80"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    networks:
+      clusternetwork:
+        ipv4_address: 172.16.0.17
+  lbfe1:
+    image: haproxy
+    container_name: lbfe1
+    tty: true
+    stdin_open: true
+    ports:
+      - 9000:9000
+    restart: always
+    volumes:
+      - "./haproxy/frontend:/usr/local/etc/haproxy:ro"
+    networks:
+      clusternetwork:
+        ipv4_address: 172.16.0.18
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.lbfe1.loadbalancer.server.port=9000"
+      - "traefik.http.routers.lbfe1.rule=Host(`localhost`)"
+      - "traefik.http.routers.lbfe1.entrypoints=http"
+  lbbe1:
+    image: haproxy
+    container_name: lbbe1
+    tty: true
+    stdin_open: true
+    ports:
+      - 9001:9001
+    restart: always
+    volumes:
+      - "./haproxy/backend:/usr/local/etc/haproxy:ro"
+    networks:
+      clusternetwork:
+        ipv4_address: 172.16.0.21
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.upload-limit.buffering.maxRequestBodyBytes=10000000"
+      - "traefik.http.services.lbbe1.loadbalancer.server.port=9001"
+      - "traefik.http.routers.lbbe1.rule=Host(`be.localhost`)"
+      - "traefik.http.routers.lbbe1.middlewares=upload-limit"
+      - "traefik.http.routers.lbbe1.entrypoints=http"
+  fe1:
+    container_name: fe1
+    build:
+      context: .
+      dockerfile: frontend.Dockerfile
+    tty: true
+    stdin_open: true
+    environment:
+      - FE_ID=1
+    expose:
+      - 9000
+    restart: unless-stopped
+    networks:
+      clusternetwork:
+        ipv4_address: 172.16.0.11
+  fe2:
+    container_name: fe2
+    build:
+      context: .
+      dockerfile: frontend.Dockerfile
+    tty: true
+    stdin_open: true
+    environment:
+      - FE_ID=2
+    expose:
+      - 9000
+    restart: unless-stopped
+    networks:
+      clusternetwork:
+        ipv4_address: 172.16.0.12
+  fe3:
+    container_name: fe3
+    build:
+      context: .
+      dockerfile: frontend.Dockerfile
+    tty: true
+    stdin_open: true
+    environment:
+      - FE_ID=3
+    expose:
+      - 9000
+    restart: unless-stopped
+    networks:
+      clusternetwork:
+        ipv4_address: 172.16.0.13
+  be1:
+    container_name: be1
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
+    expose:
+      - 9001
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+    environment:
+      - BE_ID=1
+    networks:
+      clusternetwork:
+        ipv4_address: 172.16.0.14
+  be2:
+    container_name: be2
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
+    expose:
+      - 9001
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+    environment:
+      - BE_ID=2
+    networks:
+      clusternetwork:
+        ipv4_address: 172.16.0.15
+  be3:
+    container_name: be3
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
+    expose:
+      - 9001
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+    environment:
+      - BE_ID=3
+    networks:
+      clusternetwork:
+        ipv4_address: 172.16.0.16
+networks:
+  clusternetwork:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.16.0.0/24
