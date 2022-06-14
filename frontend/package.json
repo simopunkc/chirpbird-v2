@@ -13,11 +13,11 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "axios": "^0.23.0",
+    "axios": "^0.27.2",
     "cookie-parser": "^1.4.5",
     "cors": "^2.8.5",
-    "dotenv": "^14.3.2",
-    "ejs": "^3.1.6",
+    "dotenv": "^16.0.1",
+    "ejs": "^3.1.8",
     "express": "^4.17.2",
     "ioredis": "^5.0.6",
     "jest": "^28.1.1",
@@ -28,7 +28,7 @@
     "supertest": "^6.2.3"
   },
   "devDependencies": {
-    "eslint": "^7.32.0"
+    "eslint": "^8.17.0"
   },
   "jest": {
     "verbose": true,

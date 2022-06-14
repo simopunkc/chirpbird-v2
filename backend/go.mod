@@ -5,17 +5,14 @@ go 1.18
 require (
 	github.com/aidarkhanov/nanoid v1.0.8
 	github.com/golang-jwt/jwt v3.2.2+incompatible
-	github.com/gorilla/mux v1.8.0
-	github.com/gorilla/websocket v1.5.0
-	github.com/rs/cors v1.8.2
 	go.mongodb.org/mongo-driver v1.9.1
 )
 
 require (
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/fasthttp/websocket v1.5.0 // indirect
-	github.com/gofiber/fiber/v2 v2.34.0 // indirect
-	github.com/gofiber/websocket/v2 v2.0.22 // indirect
+	github.com/gofiber/fiber/v2 v2.34.0
+	github.com/gofiber/websocket/v2 v2.0.22
 	github.com/savsgio/gotils v0.0.0-20220530130905-52f3993e8d6d // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.37.0 // indirect
