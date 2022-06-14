@@ -49,7 +49,7 @@ func CheckValidateAccessToken(c *fiber.Ctx) error {
 	if member.Email == "" {
 		resp, _ := json.Marshal(view.HttpErrorMessage{
 			Status:  403,
-			Message: "your email is not registered in our database",
+			Message: "invalid access token",
 		})
 		c.Status(403)
 		c.Set("Content-Type", "application/json; charset=utf-8")

@@ -39,6 +39,5 @@ func RequestGoogleAccessToken(values []byte) []byte {
 
 func RequestGoogleUserProfile(access_token string, id_token string) string {
 	googleUser := fetchGet("https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token="+access_token, id_token)
-	encodedAccessToken := EncryptJWT(googleUser)
-	return encodedAccessToken
+	return EncryptJWT(googleUser)
 }

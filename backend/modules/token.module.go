@@ -15,11 +15,10 @@ func GenerateOauthCsrfToken(miliseconds int64) view.RawData {
 	}
 	myJson, _ := json.Marshal(csrftoken)
 	encrypt_token := EncryptJWT(myJson)
-	rawData := view.RawData{
+	return view.RawData{
 		Plaintext:  unique,
 		Ciphertext: encrypt_token,
 	}
-	return rawData
 }
 
 func ValidateOauthCsrfToken(token string) bool {
@@ -30,20 +29,11 @@ func ValidateOauthCsrfToken(token string) bool {
 		if err != nil {
 			return false
 		}
-		if temp.Expired >= GetCurrentTimestamp() {
-			return false
-		} else {
-			return true
-		}
-	} else {
-		return false
+		return temp.Expired < GetCurrentTimestamp()
 	}
+	return false
 }
 
 func ValidateRefreshToken(expired int64) bool {
-	if expired >= GetCurrentTimestamp() {
-		return false
-	} else {
-		return true
-	}
+	return expired < GetCurrentTimestamp()
 }
