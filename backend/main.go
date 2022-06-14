@@ -6,9 +6,11 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 
 	"github.com/joho/godotenv"
 
@@ -59,6 +61,13 @@ func main() {
 			os.Getenv("FRONTEND_PROTOCOL") + os.Getenv("FRONTEND_HOST"),
 		}, ", "),
 	}))
+
+	app.Use(limiter.New(limiter.Config{
+		Max:               30,
+		Expiration:        30 * time.Second,
+		LimiterMiddleware: limiter.SlidingWindow{},
+	}))
+
 	fmt.Println("server running")
 
 	addr := flag.String("addr", backend_host, "http service address")
