@@ -3,24 +3,25 @@ package controllers
 import (
 	"encoding/base64"
 	"encoding/json"
-	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
+
+	"github.com/gofiber/fiber/v2"
 
 	model "github.com/simopunkc/chirpbird-v2/models"
 	module "github.com/simopunkc/chirpbird-v2/modules"
 	view "github.com/simopunkc/chirpbird-v2/views"
 )
 
-func GetEndpointURL(w http.ResponseWriter, r *http.Request) {
+func GetLoginPage(c *fiber.Ctx) error {
 	csrf := module.GenerateOauthCsrfToken(module.ACC_TOKEN_TIMEOUT)
 	link := module.GetGoogleAuthURL(csrf.Plaintext)
+	temp1 := base64.StdEncoding.EncodeToString([]byte(link))
 	resp, _ := json.Marshal(view.HttpSuccessMessage{
 		Status: 200,
 		Message: []interface{}{
 			map[string]interface{}{
-				"url": link,
+				"url": temp1,
 				"state": map[string]interface{}{
 					"cookie": os.Getenv("COOKIE_CSRF"),
 					"value":  csrf.Ciphertext,
@@ -34,11 +35,12 @@ func GetEndpointURL(w http.ResponseWriter, r *http.Request) {
 			},
 		},
 	})
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(resp)
+	c.Status(200)
+	c.Set("Content-Type", "application/json; charset=utf-8")
+	return c.Send(resp)
 }
 
-func VerifyLogin(w http.ResponseWriter, r *http.Request) {
+func GetVerifyLogin(c *fiber.Ctx) error {
 	var anticsrf string
 	var csrf_token view.Csrftoken
 	var validCsrf bool
@@ -46,38 +48,37 @@ func VerifyLogin(w http.ResponseWriter, r *http.Request) {
 	var userGoogle []byte
 	var isExpired bool
 	var encryptRefreshToken string
+	var respVerify view.BodyPostResponseVerifyLogin
 	var encryptJWTGoogleProfile string
 	var member view.DatabaseMember
 
-	b, _ := ioutil.ReadAll(r.Body)
 	var parseBody view.BodyRequestVerifyLogin
-	err := json.Unmarshal(b, &parseBody)
+	err := c.BodyParser(&parseBody)
 	if err != nil {
 		log.Fatal(err)
 	}
-	xsrf := r.Header.Get(os.Getenv("COOKIE_CSRF"))
+
 	if parseBody.State == "" {
 		resp, _ := json.Marshal(view.HttpErrorMessage{
 			Status:  400,
 			Message: "request state not found",
 		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(400)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	} else {
 		anticsrf = parseBody.State
 	}
 
+	xsrf := string(c.Request().Header.Peek(os.Getenv("COOKIE_CSRF")))
 	if xsrf == "" {
 		resp, _ := json.Marshal(view.HttpErrorMessage{
 			Status:  400,
 			Message: "header xsrf not found",
 		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(400)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	} else {
 		xsrfToken = module.DecryptJWT(xsrf)
 	}
@@ -90,10 +91,9 @@ func VerifyLogin(w http.ResponseWriter, r *http.Request) {
 			Status:  400,
 			Message: "invalid xsrf token",
 		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(400)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	}
 
 	if parseBody.Code == "" {
@@ -101,10 +101,9 @@ func VerifyLogin(w http.ResponseWriter, r *http.Request) {
 			Status:  400,
 			Message: "request code not found",
 		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(400)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	} else {
 		if anticsrf == csrf_token.Random {
 			validCsrf = true
@@ -120,10 +119,9 @@ func VerifyLogin(w http.ResponseWriter, r *http.Request) {
 			Status:  400,
 			Message: "xsrf token doesnt match",
 		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(400)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	}
 
 	if isExpired {
@@ -131,44 +129,47 @@ func VerifyLogin(w http.ResponseWriter, r *http.Request) {
 			Status:  400,
 			Message: "xsrf token expired, try again",
 		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(400)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	} else {
 		paramAuthentikasi := "code=" + parseBody.Code + "&clientId=" + os.Getenv("OAUTH_CLIENT_ID") + "&clientSecret=" + os.Getenv("OAUTH_SECRET") + "&redirectUri=" + os.Getenv("FRONTEND_PROTOCOL") + os.Getenv("FRONTEND_HOST") + os.Getenv("OAUTH_REDIRECT_PATH") + "&grant_type=authorization_code"
-		var resp view.BodyPostResponseVerifyLogin
 		temp := module.RequestGoogleAccessToken([]byte(paramAuthentikasi))
-		json.Unmarshal(temp, &resp)
-
-		encryptJWTGoogleProfile = module.RequestGoogleUserProfile(resp.Access_token, resp.Id_token)
-
-		userGoogle = module.DecryptJWT(encryptJWTGoogleProfile)
-		if len(userGoogle) > 0 {
-			temp3, _ := base64.StdEncoding.DecodeString(string(userGoogle))
-			json.Unmarshal(temp3, &member)
-
-			timestamp := module.GetCurrentTimestamp() + module.REF_TOKEN_TIMEOUT
-			temp_token := view.TempRefreshToken{
-				Value:   resp.Refresh_token,
-				Expired: timestamp,
-			}
-			temp_refresh_token, _ := json.Marshal(temp_token)
-			encryptRefreshToken = module.EncryptJWT(temp_refresh_token)
-		} else {
-			userGoogle = []byte{}
-		}
+		json.Unmarshal(temp, &respVerify)
 	}
 
-	if len(userGoogle) == 0 {
+	if respVerify.Access_token == "" {
 		resp, _ := json.Marshal(view.HttpErrorMessage{
 			Status:  400,
-			Message: "invalid jwt",
+			Message: "fetch post verify login to google failed",
 		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(400)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
+	} else {
+		encryptJWTGoogleProfile = module.RequestGoogleUserProfile(respVerify.Access_token, respVerify.Id_token)
+		userGoogle = module.DecryptJWT(encryptJWTGoogleProfile)
+	}
+
+	if len(userGoogle) > 0 {
+		temp3, _ := base64.StdEncoding.DecodeString(string(userGoogle))
+		json.Unmarshal(temp3, &member)
+
+		timestamp := module.GetCurrentTimestamp() + module.REF_TOKEN_TIMEOUT
+		temp_token := view.TempRefreshToken{
+			Value:   respVerify.Refresh_token,
+			Expired: timestamp,
+		}
+		temp_refresh_token, _ := json.Marshal(temp_token)
+		encryptRefreshToken = module.EncryptJWT(temp_refresh_token)
+	} else {
+		resp, _ := json.Marshal(view.HttpErrorMessage{
+			Status:  400,
+			Message: "failed decrypt jwt google profile",
+		})
+		c.Status(400)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	}
 
 	if member.Email == "" {
@@ -176,15 +177,12 @@ func VerifyLogin(w http.ResponseWriter, r *http.Request) {
 			Status:  400,
 			Message: "login expired, try again",
 		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(400)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	} else {
 		model.SaveMember(member.Email, member.Name, member.Picture, member.Verified_email)
 
-		w.WriteHeader(200)
-		w.Header().Set("Content-Type", "application/json")
 		resp, _ := json.Marshal(view.HttpSuccessMessage{
 			Status: 200,
 			Message: []interface{}{
@@ -210,33 +208,34 @@ func VerifyLogin(w http.ResponseWriter, r *http.Request) {
 				},
 			},
 		})
-		w.Write(resp)
+		c.Status(200)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	}
 }
 
-func RefreshLogin(w http.ResponseWriter, r *http.Request) {
+func GetRefreshLogin(c *fiber.Ctx) error {
 	var exp_xsrf_token bool
 	var decodeToken []byte
 	var exp_refresh_token bool
+	var respRefresh view.BodyPostResponseRefreshLogin
 	var tempToken view.TempRefreshToken
 
-	xsrf := r.Header.Get(os.Getenv("COOKIE_CSRF"))
+	xsrf := string(c.Request().Header.Peek(os.Getenv("COOKIE_CSRF")))
 	if xsrf == "" {
 		resp, _ := json.Marshal(view.HttpErrorMessage{
 			Status:  400,
 			Message: "header xsrf not found",
 		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(400)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	} else {
 		exp_xsrf_token = module.ValidateOauthCsrfToken(xsrf)
 	}
 
-	b, _ := ioutil.ReadAll(r.Body)
 	var parseBody view.BodyRequestRefreshLogin
-	err := json.Unmarshal(b, &parseBody)
+	err := c.BodyParser(&parseBody)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -246,10 +245,9 @@ func RefreshLogin(w http.ResponseWriter, r *http.Request) {
 			Status:  400,
 			Message: "request refresh token header not found",
 		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(400)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	} else {
 		decodeToken = module.DecryptJWT(parseBody.Ref_token)
 	}
@@ -262,10 +260,9 @@ func RefreshLogin(w http.ResponseWriter, r *http.Request) {
 			Status:  400,
 			Message: "invalid refresh token",
 		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(400)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	}
 
 	if !exp_xsrf_token {
@@ -275,10 +272,9 @@ func RefreshLogin(w http.ResponseWriter, r *http.Request) {
 			Status:  400,
 			Message: "xsrf token expired, try again",
 		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(400)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	}
 
 	if exp_refresh_token {
@@ -286,18 +282,26 @@ func RefreshLogin(w http.ResponseWriter, r *http.Request) {
 			Status:  403,
 			Message: "refresh token expired, try login again",
 		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(403)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	} else {
 		paramRefresh := "client_id=" + os.Getenv("OAUTH_CLIENT_ID") + "&client_secret=" + os.Getenv("OAUTH_SECRET") + "&refresh_token=" + tempToken.Value + "&grant_type=refresh_token"
-		var resp view.BodyPostResponseRefreshLogin
 		temp2 := module.RequestGoogleAccessToken([]byte(paramRefresh))
-		json.Unmarshal(temp2, &resp)
+		json.Unmarshal(temp2, &respRefresh)
+	}
 
-		encryptJWTGoogleProfile := module.RequestGoogleUserProfile(resp.Access_token, resp.Id_token)
-		result, _ := json.Marshal(view.HttpSuccessMessage{
+	if respRefresh.Access_token == "" {
+		resp, _ := json.Marshal(view.HttpErrorMessage{
+			Status:  400,
+			Message: "failed fetch refreh token to google",
+		})
+		c.Status(400)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
+	} else {
+		encryptJWTGoogleProfile := module.RequestGoogleUserProfile(respRefresh.Access_token, respRefresh.Id_token)
+		resp, _ := json.Marshal(view.HttpSuccessMessage{
 			Status: 200,
 			Message: []interface{}{
 				map[string]interface{}{
@@ -312,67 +316,15 @@ func RefreshLogin(w http.ResponseWriter, r *http.Request) {
 				},
 			},
 		})
-		w.WriteHeader(200)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(result)
+		c.Status(200)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	}
 }
 
-func GetGoogleProfile(w http.ResponseWriter, r *http.Request) {
-	var profile []byte
-	var member view.DatabaseMember
-
-	acc_token := r.Header.Get(os.Getenv("COOKIE_ACCESS_TOKEN"))
-	if acc_token == "" {
-		resp, _ := json.Marshal(view.HttpErrorMessage{
-			Status:  401,
-			Message: "request access token header not found",
-		})
-		w.WriteHeader(401)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
-	} else {
-		profile = module.DecryptJWT(acc_token)
-	}
-
-	if len(profile) > 0 {
-		temp, _ := base64.StdEncoding.DecodeString(string(profile))
-		json.Unmarshal(temp, &member)
-	} else {
-		resp, _ := json.Marshal(view.HttpErrorMessage{
-			Status:  400,
-			Message: "invalid access token header",
-		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
-	}
-
-	if member.Email == "" {
-		resp, _ := json.Marshal(view.HttpErrorMessage{
-			Status:  403,
-			Message: "your email is not registered in our database",
-		})
-		w.WriteHeader(403)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
-	} else {
-		w.Header().Set("Content-Type", "application/json")
-		resp, _ := json.Marshal(view.HttpSuccessMessage{
-			Status:  200,
-			Message: member,
-		})
-		w.Write(resp)
-	}
-}
-
-func LogOut(w http.ResponseWriter, r *http.Request) {
-	b, _ := ioutil.ReadAll(r.Body)
+func GetLogOut(c *fiber.Ctx) error {
 	var parseBody view.BodyRequestRefreshLogin
-	err := json.Unmarshal(b, &parseBody)
+	err := c.BodyParser(&parseBody)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -382,13 +334,10 @@ func LogOut(w http.ResponseWriter, r *http.Request) {
 			Status:  401,
 			Message: "request refresh token header not found",
 		})
-		w.WriteHeader(401)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(401)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	} else {
-		w.WriteHeader(200)
-		w.Header().Set("Content-Type", "application/json")
 		resp, _ := json.Marshal(view.HttpSuccessMessage{
 			Status: 200,
 			Message: []interface{}{
@@ -414,6 +363,20 @@ func LogOut(w http.ResponseWriter, r *http.Request) {
 				},
 			},
 		})
-		w.Write(resp)
+		c.Status(200)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	}
+}
+
+func GetProfileLogin(c *fiber.Ctx) error {
+	var member view.DatabaseMember = c.Locals("profile").(view.DatabaseMember)
+
+	resp, _ := json.Marshal(view.HttpSuccessMessage{
+		Status:  200,
+		Message: member,
+	})
+	c.Status(200)
+	c.Set("Content-Type", "application/json; charset=utf-8")
+	return c.Send(resp)
 }

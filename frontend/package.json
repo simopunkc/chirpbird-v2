@@ -33,6 +33,6 @@
   "jest": {
     "verbose": true,
     "globalSetup": "./_test/setup.js",
-    "globalTeardown": "./_test/rollback.js"
+    "globalTeardown": "./_test/teardown.js"
   }
 }

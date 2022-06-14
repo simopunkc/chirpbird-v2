@@ -40,19 +40,19 @@ const middlewareCheckEmail = async (_, res, next) => {
 const getLoginPage = async (req, res) => {
   try {
     if (req.cookies.ref_token) {
-      let urlAPI = env.BACKEND_URI + "/token/csrf";
+      const urlAPI = env.BACKEND_URI + "/token/csrf";
       const response = await network.getApi(urlAPI, {});
       response.data.Message.map((data) => {
         res.cookie(data.cookie, data.value, data.config);
       });
       return res.redirect("/oauth/google/refresh");
     } else {
-      let urlAPI = env.BACKEND_URI + "/oauth/google/url";
+      const urlAPI = env.BACKEND_URI + "/oauth/google/url";
       const response = await network.getApi(urlAPI, {});
       let fixUrl = ""
       response.data.Message.map((data) => {
         res.cookie(data.state.cookie, data.state.value, data.state.config);
-        fixUrl = decodeURIComponent(data.url);
+        fixUrl = decodeURIComponent(Buffer.from(data.url, 'base64').toString('ascii'));
       });
       res.render('../views/login.ejs', { printUrl: fixUrl });
     }

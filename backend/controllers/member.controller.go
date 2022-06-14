@@ -1,71 +1,48 @@
 package controllers
 
 import (
-	"encoding/base64"
 	"encoding/json"
-	"io/ioutil"
 	"log"
-	"net/http"
-	"os"
 
-	"github.com/gorilla/mux"
-
+	"github.com/gofiber/fiber/v2"
 	model "github.com/simopunkc/chirpbird-v2/models"
 	module "github.com/simopunkc/chirpbird-v2/modules"
 	view "github.com/simopunkc/chirpbird-v2/views"
 )
 
-func CreateRoom(w http.ResponseWriter, r *http.Request) {
-	var profile []byte
-	var member view.DatabaseMember
+func GetMemberRoom(c *fiber.Ctx) error {
+	var member view.DatabaseMember = c.Locals("profile").(view.DatabaseMember)
+
+	var page string
+	if c.Params("pages") == "" {
+		page = "1"
+	} else {
+		page = c.Params("pages")
+	}
+
+	temp, success := model.GetListRoom(page, member.Email)
+	if !success {
+		temp = []byte("[]")
+	}
+	resp, _ := json.Marshal(view.HttpSuccessMessage{
+		Status:  200,
+		Message: temp,
+	})
+	c.Status(200)
+	c.Set("Content-Type", "application/json")
+	return c.Send(resp)
+}
+
+func PostCreateRoom(c *fiber.Ctx) error {
+	var member view.DatabaseMember = c.Locals("profile").(view.DatabaseMember)
 	var parseBody view.BodyRequestCreateRoom
 	var id_room string
 	var id_log string
 	var create_group bool
 
-	acc_token := r.Header.Get(os.Getenv("COOKIE_ACCESS_TOKEN"))
-	if acc_token == "" {
-		resp, _ := json.Marshal(view.HttpErrorMessage{
-			Status:  401,
-			Message: "request access token header not found",
-		})
-		w.WriteHeader(401)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
-	} else {
-		profile = module.DecryptJWT(acc_token)
-	}
-
-	if len(profile) > 0 {
-		temp, _ := base64.StdEncoding.DecodeString(string(profile))
-		json.Unmarshal(temp, &member)
-	} else {
-		resp, _ := json.Marshal(view.HttpErrorMessage{
-			Status:  400,
-			Message: "invalid access token header",
-		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
-	}
-
-	if member.Email == "" {
-		resp, _ := json.Marshal(view.HttpErrorMessage{
-			Status:  403,
-			Message: "your email is not registered in our database",
-		})
-		w.WriteHeader(403)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
-	} else {
-		b, _ := ioutil.ReadAll(r.Body)
-		err := json.Unmarshal(b, &parseBody)
-		if err != nil {
-			log.Fatal(err)
-		}
+	err := c.BodyParser(&parseBody)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	if parseBody.Name == "" {
@@ -73,10 +50,9 @@ func CreateRoom(w http.ResponseWriter, r *http.Request) {
 			Status:  400,
 			Message: "request name not found",
 		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(400)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	} else {
 		id_room = module.GenerateUniqueID("G")
 		link_group := module.GenerateUniqueID("LJ")
@@ -96,135 +72,31 @@ func CreateRoom(w http.ResponseWriter, r *http.Request) {
 				"id_room":          id_room,
 			},
 		})
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(200)
+		c.Set("Content-Type", "application/json")
+		return c.Send(resp)
 	} else {
 		resp, _ := json.Marshal(view.HttpErrorMessage{
 			Status:  500,
 			Message: "failed create group",
 		})
-		w.WriteHeader(500)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(500)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	}
 }
 
-func GetListRoom(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	var page string
-	if vars["pid"] == "" {
-		page = "1"
-	} else {
-		page = vars["pid"]
-	}
-	var profile []byte
-	var member view.DatabaseMember
-
-	acc_token := r.Header.Get(os.Getenv("COOKIE_ACCESS_TOKEN"))
-	if acc_token == "" {
-		resp, _ := json.Marshal(view.HttpErrorMessage{
-			Status:  401,
-			Message: "request access token header not found",
-		})
-		w.WriteHeader(401)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
-	} else {
-		profile = module.DecryptJWT(acc_token)
-	}
-
-	if len(profile) > 0 {
-		temp, _ := base64.StdEncoding.DecodeString(string(profile))
-		json.Unmarshal(temp, &member)
-	} else {
-		resp, _ := json.Marshal(view.HttpErrorMessage{
-			Status:  400,
-			Message: "invalid access token header",
-		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
-	}
-
-	if member.Email == "" {
-		resp, _ := json.Marshal(view.HttpErrorMessage{
-			Status:  403,
-			Message: "your email is not registered in our database",
-		})
-		w.WriteHeader(403)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
-	} else {
-		temp, success := model.GetListRoom(page, member.Email)
-		if !success {
-			temp = []byte("[]")
-		}
-		resp, _ := json.Marshal(view.HttpSuccessMessage{
-			Status:  200,
-			Message: temp,
-		})
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-	}
-}
-
-func JoinRoom(w http.ResponseWriter, r *http.Request) {
-	var profile []byte
-	var member view.DatabaseMember
+func PutJoinRoom(c *fiber.Ctx) error {
+	var member view.DatabaseMember = c.Locals("profile").(view.DatabaseMember)
 	var parseBody view.BodyRequestJoinRoom
 	var check_token bool
 	var id_log string
 	var join_group bool
 	var group view.DatabaseRoom
 
-	acc_token := r.Header.Get(os.Getenv("COOKIE_ACCESS_TOKEN"))
-	if acc_token == "" {
-		resp, _ := json.Marshal(view.HttpErrorMessage{
-			Status:  401,
-			Message: "request access token header not found",
-		})
-		w.WriteHeader(401)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
-	} else {
-		profile = module.DecryptJWT(acc_token)
-	}
-
-	if len(profile) > 0 {
-		temp1, _ := base64.StdEncoding.DecodeString(string(profile))
-		json.Unmarshal(temp1, &member)
-	} else {
-		resp, _ := json.Marshal(view.HttpErrorMessage{
-			Status:  400,
-			Message: "invalid access token header",
-		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
-	}
-
-	if member.Email == "" {
-		resp, _ := json.Marshal(view.HttpErrorMessage{
-			Status:  403,
-			Message: "your email is not registered in our database",
-		})
-		w.WriteHeader(403)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
-	} else {
-		b, _ := ioutil.ReadAll(r.Body)
-		err := json.Unmarshal(b, &parseBody)
-		if err != nil {
-			log.Fatal(err)
-		}
+	err := c.BodyParser(&parseBody)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	if parseBody.Token == "" {
@@ -232,10 +104,9 @@ func JoinRoom(w http.ResponseWriter, r *http.Request) {
 			Status:  400,
 			Message: "request token not found",
 		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(400)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	} else {
 		temp, check := model.CheckTokenGroupExist(parseBody.Token)
 		if check {
@@ -258,10 +129,9 @@ func JoinRoom(w http.ResponseWriter, r *http.Request) {
 			Status:  404,
 			Message: "Group not found",
 		})
-		w.WriteHeader(404)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(404)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	}
 
 	if join_group {
@@ -273,16 +143,16 @@ func JoinRoom(w http.ResponseWriter, r *http.Request) {
 				"id_room":          group.Id_primary,
 			},
 		})
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-		return
+		c.Status(200)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	} else {
 		resp, _ := json.Marshal(view.HttpErrorMessage{
 			Status:  400,
 			Message: "Failed joining group",
 		})
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
+		c.Status(400)
+		c.Set("Content-Type", "application/json; charset=utf-8")
+		return c.Send(resp)
 	}
 }

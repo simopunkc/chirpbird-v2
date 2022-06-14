@@ -2,14 +2,15 @@ package controllers
 
 import (
 	"encoding/json"
-	"net/http"
 	"os"
+
+	"github.com/gofiber/fiber/v2"
 
 	module "github.com/simopunkc/chirpbird-v2/modules"
 	view "github.com/simopunkc/chirpbird-v2/views"
 )
 
-func GetCSRF(w http.ResponseWriter, r *http.Request) {
+func GetCSRF(c *fiber.Ctx) error {
 	csrf := module.GenerateOauthCsrfToken(module.CSRF_TOKEN_TIMEOUT)
 	resp, _ := json.Marshal(view.HttpSuccessMessage{
 		Status: 200,
@@ -26,7 +27,7 @@ func GetCSRF(w http.ResponseWriter, r *http.Request) {
 			},
 		},
 	})
-	w.WriteHeader(200)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(resp)
+	c.Status(200)
+	c.Set("Content-Type", "application/json; charset=utf-8")
+	return c.Send(resp)
 }

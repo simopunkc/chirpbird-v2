@@ -9,7 +9,7 @@ let userVerified = false
 const connectWebsocket = () => {
     console.log("Attempting websocket connection")
     endpointFE = "http://localhost"
-    socket = new WebSocket("ws://be.localhost/ws")
+    socket = new WebSocket("ws://be.localhost/ws/")
 }
 
 connectWebsocket()
@@ -124,7 +124,7 @@ socket.onerror = (error) => {
     console.log("Socket Error:", error)
 }
 
-const sendmessage = () => {
+const sendMessage = () => {
     const input = document.getElementById("message_input")
     const msg = input.value.trim()
     if (userID == "" || userName == "" || userPicture == "") {
@@ -137,7 +137,7 @@ const sendmessage = () => {
         let formdata = "id_parent=" + id_parent + "&message=" + msg
         var xhttp = new XMLHttpRequest();
         xhttp.onreadystatechange = function () {
-            if (this.readyState == 4 && this.status == 200) {
+            if (this.readyState == 4 && this.status == 201) {
                 try {
                     let raw = JSON.parse(this.responseText);
                     socket.send(JSON.stringify({
@@ -333,7 +333,7 @@ const createGroup = () => {
         let formdata = "name=" + msg
         var xhttp = new XMLHttpRequest();
         xhttp.onreadystatechange = function () {
-            if (this.readyState == 4 && this.status == 200) {
+            if (this.readyState == 4 && this.status == 201) {
                 closeModal1()
                 listGroup(1)
             }

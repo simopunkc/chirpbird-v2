@@ -2,16 +2,26 @@ const app = require('../../server');
 const request = require("supertest");
 const agent = request.agent(app);
 const sinon = require("sinon");
-const setup = require('../rollback');
+const rollback = require('../rollback');
 const network = require('../../modules/axios.module');
 
 const validAccToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjoiZXdvZ0lDSnBaQ0k2SUNJeE1UWTNNRE0zTlRneE1UWTFNVFl4TVRRMk5qTWlMQW9nSUNKbGJXRnBiQ0k2SUNKd1pXMWlaV3hoTG1Gc2JHRm9RR2R0WVdsc0xtTnZiU0lzQ2lBZ0luWmxjbWxtYVdWa1gyVnRZV2xzSWpvZ2RISjFaU3dLSUNBaWJtRnRaU0k2SUNKaWRXUnBlV0Z1ZEc4Z2MybHRieUlzQ2lBZ0ltZHBkbVZ1WDI1aGJXVWlPaUFpWW5Wa2FYbGhiblJ2SWl3S0lDQWlabUZ0YVd4NVgyNWhiV1VpT2lBaWMybHRieUlzQ2lBZ0luQnBZM1IxY21VaU9pQWlhSFIwY0hNNkx5OXNhRE11WjI5dloyeGxkWE5sY21OdmJuUmxiblF1WTI5dEwyRXRMMEZQYURFMFIycHBaaTFzVkhGSlVuZHdiMjAzTkd4ck1uVnhWM1F0YjB0cGFISmZWM0JEVTNOS1RreERUa0U5Y3prMkxXTWlMQW9nSUNKc2IyTmhiR1VpT2lBaWFXUWlDbjBLIn0.AreQinIo31287fAciC_jGsiWoNEJp8-5-H1D7MnBn1I"
 const validRefToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjoiZXlKV1lXeDFaU0k2SWpFdkx6Qm5XVjlqVVMxUE5WaElZWFJEWjFsSlFWSkJRVWRDUVZOT2QwWXRURGxKY2pObVVVbDZRekJNWTJaeWRXbERjM1ZUTlUxVWJFODRWUzFEUm5CVlFVYzJNR3hTWlY4emFFOTBTbEZ0TnpOeVJFTlVMVTV1VURsMGNsaGZVMEpOTlRKWVVtOGlMQ0pGZUhCcGNtVmtJam96TXpFNE1ERTBNekExT1gwPSJ9.q5INOFq7XotHnG_lBtOu4qBOtOW8rYi_Au0yUsYe5UQ"
 const ValidXsrfToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjoiZXlKU1lXNWtiMjBpT2lKVU4wbzBaV2xwUzA5dmVTSXNJa1Y0Y0dseVpXUWlPakUyTkRVNU9EUTVORE45In0.5gaXBdaDGAqCqo_fUVL2nHL3R20Hut1h_FDyvbAn4sE"
+const validResponseApi = {
+  data: {
+    Status: 200,
+    Message: [{
+      cookie: "test",
+      value: "test",
+      config: {}
+    }]
+  }
+}
 
 describe("Integration Test /admin", () => {
   beforeAll(async () => {
-    await setup();
+    await rollback.setup();
   });
 
   afterEach(() => {
@@ -73,15 +83,7 @@ describe("Integration Test /admin", () => {
 
     it("should valid verify login", async () => {
       let mockAxios = sinon.mock(network);
-      mockAxios.expects("postApi").once().resolves({
-        data: {
-          Message: [{
-            cookie: "test",
-            value: "test",
-            config: {}
-          }]
-        }
-      });
+      mockAxios.expects("postApi").once().resolves(validResponseApi);
       let cookie = "xsrf_token=" + ValidXsrfToken + ";"
       await agent.get("/oauth/google/verify").set('Cookie', cookie).query({
         code: "test",
@@ -103,9 +105,13 @@ describe("Integration Test /admin", () => {
     });
 
     it("should valid refresh acc_token google", async () => {
+      let mockAxios = sinon.mock(network);
+      mockAxios.expects("postApi").once().resolves(validResponseApi);
       let cookie = "xsrf_token=" + ValidXsrfToken + ";ref_token=" + validRefToken + ";"
       const response = await agent.get("/oauth/google/refresh").set('Cookie', cookie)
       expect(response.headers["location"]).toEqual("/");
+      mockAxios.verify();
+      mockAxios.restore();
     });
 
     it("should catch error", async () => {
@@ -125,9 +131,13 @@ describe("Integration Test /admin", () => {
     });
 
     it("should valid logout", async () => {
+      let mockAxios = sinon.mock(network);
+      mockAxios.expects("postApi").once().resolves(validResponseApi);
       let cookie = "ref_token=" + validRefToken + ";"
       const response = await agent.get("/oauth/logout").set('Cookie', cookie)
       expect(response.headers["location"]).toEqual("/oauth/login");
+      mockAxios.verify();
+      mockAxios.restore();
     });
 
     it("should catch error", async () => {
@@ -147,9 +157,13 @@ describe("Integration Test /admin", () => {
     });
 
     it("should valid get profile google", async () => {
+      let mockAxios = sinon.mock(network);
+      mockAxios.expects("getApi").once().resolves(validResponseApi);
       let cookie = "acc_token=" + validAccToken + ";"
       const response = await agent.get("/oauth/google/profile").set('Cookie', cookie);
       expect(response.status).toEqual(200);
+      mockAxios.verify();
+      mockAxios.restore();
     });
 
     it("should catch error", async () => {

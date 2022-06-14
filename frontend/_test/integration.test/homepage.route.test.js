@@ -2,7 +2,7 @@ const app = require('../../server');
 const request = require("supertest");
 const agent = request.agent(app);
 const sinon = require("sinon");
-const setup = require('../rollback');
+const rollback = require('../rollback');
 const network = require('../../modules/axios.module');
 const path = require("path");
 
@@ -18,7 +18,7 @@ const validProfile = {
 
 describe("Integration Test", () => {
   beforeAll(async () => {
-    await setup();
+    await rollback.setup();
   });
 
   afterEach(() => {
