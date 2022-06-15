@@ -27,7 +27,13 @@ func main() {
 
 	backend_host := ":" + os.Getenv("BACKEND_PORT")
 
-	app := fiber.New()
+	config := fiber.Config{
+		ServerHeader:  "Pasuh",
+		StrictRouting: true,
+		CaseSensitive: true,
+	}
+
+	app := fiber.New(config)
 
 	homepageRoute := app.Group("", middleware.SetSecurityHeader)
 	router.HomepageRoute(homepageRoute)
