@@ -13,7 +13,7 @@ type testCase struct {
 	expected int
 }
 
-func TestMany(t *testing.T) {
+func TestGenerateUniqueID(t *testing.T) {
 	testCases := []testCase{
 		{"a", 11},
 		{"aa", 12},
