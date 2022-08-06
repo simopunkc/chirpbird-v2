@@ -21,7 +21,7 @@
     "express": "^4.17.2",
     "ioredis": "^5.0.6",
     "jest": "^28.1.1",
-    "mongoose": "^6.3.6",
+    "mongoose": "^6.4.6",
     "nodemon": "^2.0.13",
     "query-string": "^7.0.1",
     "sinon": "^14.0.0",
