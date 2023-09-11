@@ -22,7 +22,7 @@
     "got": ">=11.8.5",
     "ioredis": "^5.0.6",
     "jest": "^28.1.1",
-    "mongoose": ">=6.11.3",
+    "mongoose": ">=7.5.0",
     "nodemon": "^2.0.13",
     "query-string": "^7.0.1",
     "sinon": "^14.0.0",
@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "eslint": "^8.17.0",
-    "mongoose": ">=6.11.3",
+    "mongoose": ">=7.5.0",
     "got": ">=11.8.5"
   },
   "jest": {
